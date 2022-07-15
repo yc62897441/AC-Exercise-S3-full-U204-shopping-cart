@@ -6,10 +6,26 @@ const PAGE_OFFSET = 0
 
 const cartController = {
   getCart: (req, res) => {
-    return Cart.findOne({ include: 'items' })
+    return Cart.findByPk(req.session.cartId, { include: 'items' })
       .then(cart => {
+        cart = cart || { items: [] }
         let totalPrice = cart.items.length > 0 ? cart.items.map(d => d.price * d.CartItem.quantity).reduce((a, b) => a + b) : 0
         return res.render('cart', { cart: cart.toJSON(), totalPrice })
+      })
+  },
+  postCart: (req, res) => {
+    return Cart.findOrCreate({ where: { id: req.session.cartId || 0 } })
+      .then(function ([cart, created]) {
+        return CartItem.findOrCreate({ where: { CartId: cart.id, ProductId: req.body.productId },default: { CartId: cart.id, ProductId: req.body.productId } })
+          .then(function ([cartItem, created]) {
+            return cartItem.update({ quantity: (cartItem.quantity || 0) + 1 })
+              .then((cartItem) => {
+                req.session.cartId = cart.id
+                return req.session.save(() => {
+                  return res.redirect('back')
+                })
+              })
+          })
       })
   }
 }

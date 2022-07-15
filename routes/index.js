@@ -10,6 +10,7 @@ router.get('/', (req, res) => {
 router.get('/products', productController.getProducts)
 
 router.get('/cart', cartController.getCart)
+router.post('/cart', cartController.postCart)
 
 
 module.exports = router
