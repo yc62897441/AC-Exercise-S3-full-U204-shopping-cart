@@ -14,6 +14,13 @@ const orderController = {
             OrderItem: { ...item.OrderItem.dataValues }
           }))
         }))
+
+        // 另一種方式處理 include 產生的問題，不用 map，1.陣列存到物件內；2.物件轉成JSON；3.JSON轉回物件；4.物件取出存成陣列
+        // orders = { orders: orders }
+        // orders = JSON.stringify(orders)
+        // orders = JSON.parse(orders)
+        // orders = orders.orders.map(order => order)
+
         return res.render('orders', { orders })
       })
   },
