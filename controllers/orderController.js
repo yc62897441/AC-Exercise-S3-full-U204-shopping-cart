@@ -1,7 +1,20 @@
+const nodemailer = require('nodemailer')
 const db = require('../models')
 const Order = db.Order
 const OrderItem = db.OrderItem
 const Cart = db.Cart
+
+// Gmail 自 2022/5/30 停用低安全性應用程式存取權
+// 還未找出解方，以 nodemailer 使用 gmail
+// For gmail, Less secure app access is no longer available
+// https://stackoverflow.com/questions/59188483/error-invalid-login-535-5-7-8-username-and-password-not-accepted
+let transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'myaccount@gmail.com',
+    pass: 'mypassword'
+  }
+})
 
 const orderController = {
   getOrders: (req, res) => {
@@ -51,6 +64,23 @@ const orderController = {
                 })
               )
             }
+
+            let mailOptions = {
+              from: 'myaccount@gmail.com',
+              to: 'youraccount@gmail.com',
+              subject: `${order.id} 訂單成立`,
+              html: `The body of the email goes here in HTML`,
+              // text: `${order.id} 訂單成立`
+            }
+
+            transporter.sendMail(mailOptions, function (error, info) {
+              if (error) {
+                console.log(error)
+              } else {
+                console.log(`Email sent: ${info.response}`)
+              }
+            })
+
             return Promise.all(results)
               .then(() => {
                 res.redirect('/orders')
