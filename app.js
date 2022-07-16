@@ -1,3 +1,7 @@
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config()
+}
+
 const express = require('express')
 const exphbs = require('express-handlebars')
 const session = require('express-session')
@@ -7,7 +11,7 @@ const bodyParser = require('body-parser')
 const indexRouter = require('./routes/index')
 
 const app = express()
-const PORT = 3000
+const PORT = process.env.PORT || 3000
 
 app.engine('handlebars', exphbs.engine({ defaultLayout: 'main', helpers: require('./config/handlebars-helpers') }))
 app.set('view engine', 'handlebars')
@@ -17,7 +21,7 @@ app.use(bodyParser.json())
 
 app.use(cookieParser())
 app.use(session({
-  secret: 'ac',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: true,
   name: 'ac',

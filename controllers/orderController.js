@@ -8,13 +8,29 @@ const Cart = db.Cart
 // 還未找出解方，以 nodemailer 使用 gmail
 // For gmail, Less secure app access is no longer available
 // https://stackoverflow.com/questions/59188483/error-invalid-login-535-5-7-8-username-and-password-not-accepted
+// let transporter = nodemailer.createTransport({
+//   service: 'gmail',
+//   auth: {
+//     user: 'myaccount@gmail.com',
+//     pass: 'mypassword'
+//   }
+// })
+
+// 改用 Node.js-OAuth 2.0 & nodemailer & Gmail 實作
+// https://israynotarray.com/nodejs/20191228/1009061739/
 let transporter = nodemailer.createTransport({
   service: 'gmail',
+  secure: true,
   auth: {
-    user: 'myaccount@gmail.com',
-    pass: 'mypassword'
+    type: 'OAuth2',
+    user: process.env.user,
+    clientId: process.env.clientId,
+    clientSecret: process.env.clientSecret,
+    refreshToken: process.env.refreshToken,
+    accessToken: process.env.accessToken,
   }
 })
+
 
 const orderController = {
   getOrders: (req, res) => {
@@ -66,8 +82,8 @@ const orderController = {
             }
 
             let mailOptions = {
-              from: 'myaccount@gmail.com',
-              to: 'youraccount@gmail.com',
+              from: process.env.user,
+              to: process.env.receiver,
               subject: `${order.id} 訂單成立`,
               html: `The body of the email goes here in HTML`,
               // text: `${order.id} 訂單成立`

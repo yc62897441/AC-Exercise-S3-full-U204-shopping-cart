@@ -1,1 +1,19 @@
-node_modules
+# OS X
+.DS_Store*
+Icon?
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# npm
+/node_modules
+*.log
+*.gz
+
+.env
+google_Oauth.json
+google_Oauth2.json
+google_Oauth3.json
