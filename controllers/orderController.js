@@ -116,6 +116,22 @@ const orderController = {
             return res.redirect('back')
           })
       })
+  },
+  getPayment: (req, res) => {
+    return Order.findByPk(req.params.id)
+      .then(order => {
+        order = order.toJSON()
+
+        return res.render('payment', { order })
+      })
+  },
+  spgatewayCallback: (req, res) => {
+    console.log('===== spgatewayCallback =====')
+    console.log('===== spgatewayCallback =====')
+    console.log(req.body)
+    console.log('==========')
+    console.log('==========')
+    return res.redirect('back')
   }
 }
 
