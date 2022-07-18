@@ -6,7 +6,7 @@ const OrderItem = db.OrderItem
 const Cart = db.Cart
 
 
-const URL = ''
+const URL = process.env.URL
 const MerchantID = process.env.MerchantID
 const HashKey = process.env.HashKey
 const HashIV = process.env.HashIV
@@ -92,6 +92,15 @@ function create_mpg_sha_encrypt(mpg_aes_encrypt) {
   let plainText = `HashKey=${HashKey}&${mpg_aes_encrypt}&HashIV=${HashIV}`
   const mpg_sha_encrypt = sha.update(plainText).digest('hex').toUpperCase()
   return mpg_sha_encrypt
+}
+
+function create_mpg_aes_decrypt(TradeInfo) {
+  let decrypt = crypto.createDecipheriv("aes256", HashKey, HashIV);
+  decrypt.setAutoPadding(false);
+  let text = decrypt.update(TradeInfo, "hex", "utf8");
+  let plainText = text + decrypt.final("utf8");
+  let result = plainText.replace(/[\x00-\x20]+/g, "");
+  return result;
 }
 
 // Gmail 自 2022/5/30 停用低安全性應用程式存取權
@@ -208,7 +217,7 @@ const orderController = {
       })
   },
   getPayment: (req, res) => {
-    const Amt = 10000 
+    const Amt = 10000
     const Desc = '測試'
     const email = 'abc@abc.com'
     const TradeInfo = getTradeInfo(Amt, Desc, email)
@@ -220,14 +229,33 @@ const orderController = {
 
     return Order.findByPk(req.params.id)
       .then(order => {
-        order = order.toJSON()
-        console.log('TradeInfo', TradeInfo)
-        console.log('**************')
-        console.log('**************')
-        return res.render('payment', { order, tradeInfo: TradeInfo })
+        const shortMerchantOrderNo = Number(TradeInfo.MerchantOrderNo.toString().slice(0, 10))      
+        order.update({
+          sn: shortMerchantOrderNo
+        })
+          .then(order => {
+            order = order.toJSON()
+            return res.render('payment', { order, tradeInfo: TradeInfo })
+          })
       })
   },
   spgatewayCallback: (req, res) => {
+
+    const data = JSON.parse(create_mpg_aes_decrypt(req.body.TradeInfo))
+    console.log('===== spgatewayCallback: create_mpg_aes_decrypt、data =====')
+    console.log(data)
+    const shortMerchantOrderNo = Number(data['Result']['MerchantOrderNo'].toString().slice(0, 10))
+
+    return Order.findAll({ where: { sn: shortMerchantOrderNo }})
+    .then(orders => {
+      orders[0].update({
+        payment_status: 1,
+      })
+      .then(order => {
+        return res.redirect('/orders')
+      })
+    })
+
     console.log('===== spgatewayCallback =====')
     console.log('===== spgatewayCallback =====')
     console.log(req.body)
