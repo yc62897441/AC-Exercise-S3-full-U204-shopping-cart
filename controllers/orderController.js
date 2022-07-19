@@ -5,7 +5,6 @@ const Order = db.Order
 const OrderItem = db.OrderItem
 const Cart = db.Cart
 
-
 const URL = process.env.URL
 const MerchantID = process.env.MerchantID
 const HashKey = process.env.HashKey
@@ -15,18 +14,13 @@ const ReturnURL = URL + "/spgateway/callback?from=ReturnURL"
 const NotifyURL = URL + "/spgateway/callback?from=NotifyURL"
 const ClientBackURL = URL + "/orders"
 
-const testData = {
-  name: 'John',
-  wife: 'Mary'
-}
-
 function getTradeInfo(Amt, Desc, email) {
   data = {
     'MerchantID': MerchantID, // 商店代號
     'RespondType': 'JSON', // 回傳格式
     'TimeStamp': Date.now(), // 時間戳記
     'Version': 2.0, // 串接程式版本
-    'MerchantOrderNo': Date.now(), // 商店訂單編號
+    'MerchantOrderNo': Date.now(), // 商店訂單編號(使用 timestamp時間戳)
     'LoginType': 0, // 智付通會員
     'OrderComment': 'OrderComment', // 商店備註
     'Amt': Amt, // 訂單金額
@@ -38,30 +32,17 @@ function getTradeInfo(Amt, Desc, email) {
   }
 
   const chainedData = getDataChain(data)
-  console.log('chainedData', chainedData)
-  console.log('==========')
-  console.log('==========')
   const mpg_aes_encrypt = create_mpg_aes_encrypt(chainedData)
-  console.log('mpg_aes_encrypt', mpg_aes_encrypt)
-  console.log('==========')
-  console.log('==========')
   const mpg_sha_encrypt = create_mpg_sha_encrypt(mpg_aes_encrypt)
-  console.log('mpg_sha_encrypt', mpg_sha_encrypt)
-  console.log('==========')
-  console.log('==========')
 
   tradeInfo = {
     'MerchantID': MerchantID, // 商店代號
     'TradeInfo': mpg_aes_encrypt, // 加密後參數
-    'TradeSha': mpg_sha_encrypt,
+    'TradeSha': mpg_sha_encrypt, // 加密參數再雜湊後
     'Version': 2.0, // 串接程式版本
     'PayGateWay': PayGateWay,
     'MerchantOrderNo': data.MerchantOrderNo,
   }
-
-  console.log('tradeInfo', tradeInfo)
-  console.log('==========')
-  console.log('==========')
   return tradeInfo
 }
 
@@ -76,13 +57,7 @@ function getDataChain(TradeInfo) {
 
 function create_mpg_aes_encrypt(chainedData) {
   let encrypt = crypto.createCipheriv("aes256", HashKey, HashIV)
-  console.log('encrypt', encrypt)
-  console.log('====')
-  console.log('====')
   let enc = encrypt.update(chainedData, "utf8", "hex")
-  console.log('enc', enc)
-  console.log('====')
-  console.log('====')
   let mpg_aes_encrypt = enc + encrypt.final("hex")
   return mpg_aes_encrypt
 }
@@ -130,7 +105,6 @@ let transporter = nodemailer.createTransport({
   }
 })
 
-
 const orderController = {
   getOrders: (req, res) => {
     Order.findAll({ include: 'items' })
@@ -142,13 +116,11 @@ const orderController = {
             OrderItem: { ...item.OrderItem.dataValues }
           }))
         }))
-
         // 另一種方式處理 include 產生的問題，不用 map，1.陣列存到物件內；2.物件轉成JSON；3.JSON轉回物件；4.物件取出存成陣列
         // orders = { orders: orders }
         // orders = JSON.stringify(orders)
         // orders = JSON.parse(orders)
         // orders = orders.orders.map(order => order)
-
         return res.render('orders', { orders })
       })
   },
@@ -217,21 +189,19 @@ const orderController = {
       })
   },
   getPayment: (req, res) => {
-    const Amt = 10000
-    const Desc = '測試'
-    const email = 'abc@abc.com'
-    const TradeInfo = getTradeInfo(Amt, Desc, email)
-    console.log('**************')
-    console.log('**************')
-    console.log('TradeInfo', TradeInfo)
-    console.log('**************')
-    console.log('**************')
-
     return Order.findByPk(req.params.id)
       .then(order => {
-        const shortMerchantOrderNo = Number(TradeInfo.MerchantOrderNo.toString().slice(0, 10))      
+        const Amt = order.amount
+        const Desc = '測試：商品資訊'
+        const email = 'abc@abc.com'
+        const TradeInfo = getTradeInfo(Amt, Desc, email)
+
+        // 原本資料表 sn欄位 的型態是INT、長度是10，用 workbench 改成 VARCHAR(1024)，增加儲存長度，就不需要再使用 shortMerchantOrderNo 了
+        // const shortMerchantOrderNo = Number(TradeInfo.MerchantOrderNo.toString().slice(0, 10))
+        const sn = TradeInfo.MerchantOrderNo
         order.update({
-          sn: shortMerchantOrderNo
+          sn: sn
+          //sn: shortMerchantOrderNo
         })
           .then(order => {
             order = order.toJSON()
@@ -240,28 +210,21 @@ const orderController = {
       })
   },
   spgatewayCallback: (req, res) => {
-
     const data = JSON.parse(create_mpg_aes_decrypt(req.body.TradeInfo))
-    console.log('===== spgatewayCallback: create_mpg_aes_decrypt、data =====')
-    console.log(data)
-    const shortMerchantOrderNo = Number(data['Result']['MerchantOrderNo'].toString().slice(0, 10))
+    // 原本資料表 sn欄位 的型態是INT、長度是10，用 workbench 改成 VARCHAR(1024)，增加儲存長度，就不需要再使用 shortMerchantOrderNo 了
+    //const shortMerchantOrderNo = Number(data['Result']['MerchantOrderNo'].toString().slice(0, 10))
+    const sn = data['Result']['MerchantOrderNo']
 
-    return Order.findAll({ where: { sn: shortMerchantOrderNo }})
-    .then(orders => {
-      orders[0].update({
-        payment_status: 1,
+    // return Order.findAll({ where: { sn: shortMerchantOrderNo } })
+    return Order.findAll({ where: { sn: sn } })
+      .then(orders => {
+        orders[0].update({
+          payment_status: 1,
+        })
+          .then(order => {
+            return res.redirect('/orders')
+          })
       })
-      .then(order => {
-        return res.redirect('/orders')
-      })
-    })
-
-    console.log('===== spgatewayCallback =====')
-    console.log('===== spgatewayCallback =====')
-    console.log(req.body)
-    console.log('==========')
-    console.log('==========')
-    return res.redirect('/orders')
   }
 }
 
